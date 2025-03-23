@@ -20,5 +20,5 @@ set(PILOT_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
 set(CMAKE_INSTALL_PREFIX "${PILOT_ROOT_DIR}/bin")
 set(BINARY_ROOT_DIR "${CMAKE_INSTALL_PREFIX}/")
 
-
+add_compile_options(/WX-)
 add_subdirectory(engine)
