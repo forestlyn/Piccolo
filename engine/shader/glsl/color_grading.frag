@@ -13,18 +13,18 @@ layout(location = 0) out highp vec4 out_color;
 void main() {
     highp ivec2 lut_tex_size = textureSize(color_grading_lut_texture_sampler, 0);
     highp float _COLORS = float(lut_tex_size.y);
-    // highp float _Nums = float(lut_tex_size.x) / _COLORS;
+    highp float _Nums = float(lut_tex_size.x) / _COLORS;
 
     highp vec4 color = subpassLoad(in_color).rgba;
 
-    // highp float blue_index = color.b * _Nums / 255.0;
-    // highp float green_index = color.g / 255.0;
-    // highp float red_index = color.r / 255.0;
+    highp float blue_index = color.b * _Nums;
+    highp float green_index = color.g;
+    highp float red_index = color.r;
 
-    // highp vec2 uv_0 = vec2(float(int(blue_index) + 1) + green_index, red_index);
-    // highp vec2 uv_1 = vec2(float(int(blue_index)) + green_index, red_index);
-    // highp vec4 color_sample_0 = texture(color_grading_lut_texture_sampler, uv_0);
-    // highp vec4 color_sample_1 = texture(color_grading_lut_texture_sampler, uv_1);
-    // out_color = mix(color_sample_0, color_sample_1, fract(1 + blue_index - float(int(blue_index))));
-    out_color = color;
+    highp vec2 uv_0 = vec2(floor(blue_index + 1.0) + red_index, green_index);
+    highp vec2 uv_1 = vec2(floor(blue_index) + red_index, green_index);
+    highp vec4 color_sample_0 = texture(color_grading_lut_texture_sampler, uv_0);
+    highp vec4 color_sample_1 = texture(color_grading_lut_texture_sampler, uv_1);
+    out_color = mix(color_sample_0, color_sample_1, fract(blue_index));
+    // out_color = color;
 }
