@@ -4,5 +4,6 @@
   "max_sprint_speed_ratio": 2.0,
   "move_acceleration": 2,
   "sprint_acceleration": 2,
-  "jump_height": 1
+  "jump_height": 1,
+  "jump_speed": 1.0
 }
