@@ -137,7 +137,7 @@ namespace Pilot
 
         const float gravity = physics_scene->getGravity().length();
 
-        if (m_jump_state == JumpState::idle && m_controller->isTouchGround() == false)
+        if (m_jump_state == JumpState::idle && m_controller->isFalling())
         {
             m_jump_state = JumpState::falling;
         }

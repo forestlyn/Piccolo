@@ -23,8 +23,11 @@ namespace Pilot
 
         bool isTouchGround() const { return m_is_touch_ground; }
 
+		bool isFalling() const { return m_is_falling; }
+
     protected:
         bool m_is_touch_ground {false};
+		bool m_is_falling{ false }; 
     };
 
     class CharacterController : public Controller
