@@ -19,13 +19,14 @@ namespace Pilot
     public:
         virtual ~Controller() = default;
 
-        virtual Vector3 move(const Vector3& current_position, const Vector3& displacement) = 0;
+        virtual Vector3 move(const Vector3& current_position, const Vector3& displacement, float delta_time) = 0;
 
         bool isTouchGround() const { return m_is_touch_ground; }
 
 		bool isFalling() const { return m_is_falling; }
 
     protected:
+		float m_coyote_time{ 0.0f };
         bool m_is_touch_ground {false};
 		bool m_is_falling{ false }; 
     };
@@ -35,7 +36,7 @@ namespace Pilot
     public:
         CharacterController(const Capsule& capsule);
 
-        Vector3 move(const Vector3& current_position, const Vector3& displacement) override;
+        Vector3 move(const Vector3& current_position, const Vector3& displacement,float delta_time) override;
 
     private:
         Capsule        m_capsule;

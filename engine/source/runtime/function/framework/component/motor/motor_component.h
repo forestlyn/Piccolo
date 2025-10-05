@@ -44,7 +44,7 @@ namespace Pilot
         void calculatedDesiredVerticalMoveSpeed(unsigned int command, float delta_time);
         void calculatedDesiredMoveDirection(unsigned int command, const Quaternion& object_rotation);
         void calculateDesiredDisplacement(float delta_time);
-        void calculateTargetPosition(const Vector3&& current_position);
+        void calculateTargetPosition(const Vector3&& current_position, float delta_time);
 
         META(Enable)
         MotorComponentRes m_motor_res;

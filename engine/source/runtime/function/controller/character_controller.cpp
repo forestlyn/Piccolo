@@ -27,7 +27,7 @@ namespace Pilot
 				Vector3::UNIT_SCALE);
 	}
 
-	Vector3 CharacterController::move(const Vector3& current_position, const Vector3& displacement)
+	Vector3 CharacterController::move(const Vector3& current_position, const Vector3& displacement,float delta_time)
 	{
 		std::shared_ptr<PhysicsScene> physics_scene =
 			g_runtime_global_context.m_world_manager->getCurrentActivePhysicsScene().lock();
@@ -54,6 +54,14 @@ namespace Pilot
 			Vector3::NEGATIVE_UNIT_Z,
 			0.105f,
 			hits);
+		if (temp_m_is_touch_ground)
+		{
+			m_coyote_time = 0.0f;
+		}
+		else
+		{
+			m_coyote_time += delta_time;
+		}
 
 		hits.clear();
 
@@ -99,7 +107,7 @@ namespace Pilot
 			if (!physics_scene->isOverlap(m_rigidbody_shape, step_transform.getMatrix()))
 			{
 				// 找到碰到地面的高度
-				for (float i = 0.0f; i <= horizontal_stepup * 2; i += 0.01f)
+				for (float i = 0.0f; i <= horizontal_stepup; i += 0.01f)
 				{
 					if (physics_scene->sweep(
 						m_rigidbody_shape,
@@ -108,7 +116,7 @@ namespace Pilot
 						abs(i),
 						hits))
 					{
-						LOG_DEBUG("CharacterController::move: step up success, i = {}", i);
+						//LOG_DEBUG("CharacterController::move: step up success, i = {}", i);
 						final_position += horizontal_displacement + Vector3::UNIT_Z * (horizontal_stepup - i);
 						is_up_stair = true;
 						break;
@@ -122,7 +130,7 @@ namespace Pilot
 				// 如果碰撞距离小于0.01f，说明平移到不可跨越障碍物边缘了，准备沿着障碍物滑动
 				if (hits[0].hit_distance <= 0.01f)
 				{
-					LOG_DEBUG("CharacterController::move: horizontal pass hit, sliding along wall");
+					//LOG_DEBUG("CharacterController::move: horizontal pass hit, sliding along wall");
 					// 沿着墙壁滑动
 					// 思路：当无法运动也不是上楼梯时，找可以移动的方向移动，即运动的方向没有障碍物
 					// 又移动的方向应该和输入方向夹角较小，因此扫描移动方向-90~+90范围,从0开始向正负方向扫描，找到较小的偏转角度方向移动
@@ -133,6 +141,7 @@ namespace Pilot
 						float x = cos(delta) * originx - sin(delta) * originy;
 						float y = cos(delta) * originy + sin(delta) * originx;
 						Vector3 revise_horizontal_direction = Vector3(x, y, 0).normalisedCopy();
+						hits.clear();
 						if (!physics_scene->sweep(
 							m_rigidbody_shape,
 							world_transform.getMatrix(),
@@ -146,6 +155,7 @@ namespace Pilot
 						x = cos(delta) * originx + sin(delta) * originy;
 						y = cos(delta) * originy - sin(delta) * originx;
 						revise_horizontal_direction = Vector3(x, y, 0).normalisedCopy();
+						hits.clear();
 						if (!physics_scene->sweep(
 							m_rigidbody_shape,
 							world_transform.getMatrix(),
@@ -171,7 +181,8 @@ namespace Pilot
 					current_position + horizontal_displacement,
 					Quaternion::IDENTITY,
 					Vector3::UNIT_SCALE);
-				// 找到碰到地面的高度
+				// 能否在可移动竖直方向碰到地面，能找到碰到地面的高度
+				hits.clear();
 				if (physics_scene->sweep(
 					m_rigidbody_shape,
 					step_transform.getMatrix(),
@@ -179,28 +190,18 @@ namespace Pilot
 					abs(horizontal_stepup),
 					hits))
 				{
-					Vector3 downward_hit_displacement = horizontal_displacement + Vector3::NEGATIVE_UNIT_Z * hits[0].hit_distance;
-					Vector3 downward_hit_direction = downward_hit_displacement.normalisedCopy();
-
-					// 找到后再扫描移动过去
-					if (physics_scene->sweep(
-						m_rigidbody_shape,
-						world_transform.getMatrix(),
-						downward_hit_direction,
-						downward_hit_displacement.length(),
-						hits))
+					// 保证有一定的下落距离才算是下楼梯
+					if (hits[0].hit_distance >= 0.001f)
 					{
-						if (hits[0].hit_distance >= 0.01f)
-						{
-							LOG_DEBUG("CharacterController::move: step down success, i = {}", hits[0].hit_distance);
-							final_position += downward_hit_direction * hits[0].hit_distance;
-							is_down_stair = true;
-						}
+						LOG_DEBUG("CharacterController::move: step down success test, hit distance = {} {} {}", hits[0].hit_distance, horizontal_displacement.x,horizontal_displacement.y);
+						final_position += Vector3::NEGATIVE_UNIT_Z * hits[0].hit_distance + horizontal_displacement;
+						is_down_stair = true;
 					}
+					
 				}
 			}
 
-
+			// 没有下楼梯，那么就直接平移
 			if (!is_down_stair)
 			{
 				//LOG_DEBUG("CharacterController::move: horizontal pass no hit, moving normally");
@@ -208,9 +209,11 @@ namespace Pilot
 			}
 		}
 
-		LOG_DEBUG("CharacterController::move: m_is_touch_ground = {} {}", m_is_touch_ground, physics_scene->isOverlap(m_rigidbody_shape, world_transform.getMatrix()));
-		m_is_touch_ground = temp_m_is_touch_ground;
+		//LOG_DEBUG("CharacterController::move: m_is_touch_ground = {} {}", m_is_touch_ground, physics_scene->isOverlap(m_rigidbody_shape, world_transform.getMatrix()));
+		m_is_touch_ground = temp_m_is_touch_ground || m_coyote_time <= 0.2f;
 		m_is_falling = !m_is_touch_ground;
+		if(m_is_falling)
+			LOG_DEBUG("CharacterController::move: m_is_falling {} {}", m_is_touch_ground, m_coyote_time);
 		//if (m_is_touch_ground) {
 		//	m_is_falling = false;
 		//}
@@ -339,22 +342,23 @@ namespace Pilot
 		//当不在地面上并且卡住时，使用水平方向，前后探测到一个不卡的位置设置为最终位置
 		if (!temp_m_is_touch_ground && physics_scene->isOverlap(m_rigidbody_shape, world_transform.getMatrix())) {
 			flag = 0;
-			for (int i = 1; i < 100; i++)
+			LOG_DEBUG("CharacterController::move: in air and cant move, trying to find way out");
+			for (float i = 0.01f; i <= 1.f; i+=0.01)
 			{
 				if (!physics_scene->sweep(
 					m_rigidbody_shape,
 					world_transform.getMatrix(),
 					-horizontal_direction,
-					horizontal_displacement.length() * i,
+					horizontal_direction.length() * i,
 					hits)) {
-					final_position -= horizontal_displacement * i;
+					final_position -= horizontal_direction * i;
 					break;
 				}
 				else if (!physics_scene->sweep(
 					m_rigidbody_shape,
 					world_transform.getMatrix(),
 					horizontal_direction,
-					horizontal_displacement.length() * i,
+					horizontal_direction.length() * i,
 					hits)) {
 					final_position += horizontal_displacement * i;
 					break;

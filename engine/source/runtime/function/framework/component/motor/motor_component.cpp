@@ -79,7 +79,7 @@ namespace Pilot
         calculatedDesiredVerticalMoveSpeed(command, delta_time);
         calculatedDesiredMoveDirection(command, transform_component->getRotation());
         calculateDesiredDisplacement(delta_time);
-        calculateTargetPosition(transform_component->getPosition());
+        calculateTargetPosition(transform_component->getPosition(),delta_time);
 
         transform_component->setPosition(m_target_position);
 
@@ -210,7 +210,7 @@ namespace Pilot
             Vector3::UNIT_Z * m_vertical_move_speed * delta_time;
     }
 
-    void MotorComponent::calculateTargetPosition(const Vector3&& current_position)
+    void MotorComponent::calculateTargetPosition(const Vector3&& current_position,float delta_time)
     {
         Vector3 final_position;
 
@@ -220,7 +220,7 @@ namespace Pilot
                 final_position = current_position + m_desired_displacement;
                 break;
             case ControllerType::physics:
-                final_position = m_controller->move(current_position, m_desired_displacement);
+                final_position = m_controller->move(current_position, m_desired_displacement,delta_time);
                 break;
             default:
                 final_position = current_position;
