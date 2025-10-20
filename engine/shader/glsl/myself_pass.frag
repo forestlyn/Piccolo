@@ -26,5 +26,5 @@ void main() {
     highp vec4 color_sample_0 = texture(color_grading_lut_texture_sampler, uv_0);
     highp vec4 color_sample_1 = texture(color_grading_lut_texture_sampler, uv_1);
     out_color = mix(color_sample_0, color_sample_1, fract(blue_index));
-    // out_color = color;
+    //out_color = mix(color, vec4(0.0), 0.0);
 }
