@@ -6,25 +6,21 @@
 
 layout(input_attachment_index = 0, set = 0, binding = 0) uniform highp subpassInput in_color;
 
-layout(set = 0, binding = 1) uniform sampler2D color_grading_lut_texture_sampler;
-
-layout(location = 0) out highp vec4 out_color;
+layout(location = 0) out highp vec4 outColor;
 
 void main() {
-    highp ivec2 lut_tex_size = textureSize(color_grading_lut_texture_sampler, 0);
-    highp float _COLORS = float(lut_tex_size.y);
-    highp float _Nums = float(lut_tex_size.x) / _COLORS;
+    // 只使用当前像素的简单FXAA
+    highp vec4 center_color = subpassLoad(in_color);
+    highp vec3 color = center_color.rgb;
 
-    highp vec4 color = subpassLoad(in_color).rgba;
+    // 使用导数进行边缘检测（不需要采样周围像素）
+    highp vec3 dx = dFdx(color);
+    highp vec3 dy = dFdy(color);
+    highp float edge = length(dx * dx + dy * dy);
 
-    highp float blue_index = color.b * _Nums;
-    highp float green_index = color.g;
-    highp float red_index = color.r;
+    // 简单的抗锯齿处理
+    highp float blend_factor = clamp(edge * 3.0, 0.0, 0.3);
 
-    highp vec2 uv_0 = vec2((floor(blue_index) + red_index) / _Nums, green_index);
-    highp vec2 uv_1 = vec2((floor(blue_index + 1.0) + red_index) / _Nums, green_index);
-    highp vec4 color_sample_0 = texture(color_grading_lut_texture_sampler, uv_0);
-    highp vec4 color_sample_1 = texture(color_grading_lut_texture_sampler, uv_1);
-    out_color = mix(color_sample_0, color_sample_1, fract(blue_index));
-    //out_color = mix(color, vec4(0.0), 0.0);
+    // 轻微模糊来抗锯齿
+    outColor = vec4(color * (1.0 - blend_factor) + vec3(0.5) * blend_factor, 1.0);
 }

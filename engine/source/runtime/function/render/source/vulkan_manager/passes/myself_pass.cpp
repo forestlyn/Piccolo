@@ -5,7 +5,7 @@
 #include "runtime/function/render/include/render/vulkan_manager/vulkan_util.h"
 #include "runtime/core/base/macro.h"
 
-#include <post_process_vert.h>
+#include <myself_pass_vert.h>
 #include <myself_pass_frag.h>
 namespace Pilot
 {
@@ -22,35 +22,28 @@ namespace Pilot
     {
         _descriptor_infos.resize(1);
 
-        VkDescriptorSetLayoutBinding post_process_global_layout_bindings[2] = {};
+        VkDescriptorSetLayoutBinding layout_bindings[1] = {};
 
-        VkDescriptorSetLayoutBinding& post_process_global_layout_input_attachment_binding =
-            post_process_global_layout_bindings[0];
-        post_process_global_layout_input_attachment_binding.binding = 0;
-        post_process_global_layout_input_attachment_binding.descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
-        post_process_global_layout_input_attachment_binding.descriptorCount = 1;
-        post_process_global_layout_input_attachment_binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+        // 修改为纹理采样器而不是输入附件
+        VkDescriptorSetLayoutBinding& texture_binding = layout_bindings[0];
+        texture_binding.binding = 0;
+        texture_binding.descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT; // 改为采样器
+        texture_binding.descriptorCount = 1;
+        texture_binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
-        VkDescriptorSetLayoutBinding& post_process_global_layout_LUT_binding = post_process_global_layout_bindings[1];
-        post_process_global_layout_LUT_binding.binding = 1;
-        post_process_global_layout_LUT_binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        post_process_global_layout_LUT_binding.descriptorCount = 1;
-        post_process_global_layout_LUT_binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-
-        VkDescriptorSetLayoutCreateInfo post_process_global_layout_create_info;
-        post_process_global_layout_create_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-        post_process_global_layout_create_info.pNext = NULL;
-        post_process_global_layout_create_info.flags = 0;
-        post_process_global_layout_create_info.bindingCount =
-            sizeof(post_process_global_layout_bindings) / sizeof(post_process_global_layout_bindings[0]);
-        post_process_global_layout_create_info.pBindings = post_process_global_layout_bindings;
+        VkDescriptorSetLayoutCreateInfo layout_create_info;
+        layout_create_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+        layout_create_info.pNext = NULL;
+        layout_create_info.flags = 0;
+		layout_create_info.bindingCount = sizeof(layout_bindings) / sizeof(layout_bindings[0]);
+        layout_create_info.pBindings = layout_bindings;
 
         if (VK_SUCCESS != vkCreateDescriptorSetLayout(m_p_vulkan_context->_device,
-            &post_process_global_layout_create_info,
+            &layout_create_info,
             NULL,
             &_descriptor_infos[0].layout))
         {
-            throw std::runtime_error("create post process global layout");
+            throw std::runtime_error("create FXAA descriptor set layout");
         }
     }
 
@@ -72,7 +65,7 @@ namespace Pilot
         }
 
         VkShaderModule vert_shader_module =
-            PVulkanUtil::createShaderModule(m_p_vulkan_context->_device, POST_PROCESS_VERT);
+            PVulkanUtil::createShaderModule(m_p_vulkan_context->_device, MYSELF_PASS_VERT);
         VkShaderModule frag_shader_module =
             PVulkanUtil::createShaderModule(m_p_vulkan_context->_device, MYSELF_PASS_FRAG);
 
@@ -215,20 +208,13 @@ namespace Pilot
 
     void PMySelfPass::updateAfterFramebufferRecreate(VkImageView input_attachment)
     {
-        VkDescriptorImageInfo post_process_per_frame_input_attachment_info = {};
-        post_process_per_frame_input_attachment_info.sampler =
+        VkDescriptorImageInfo myself_pass_per_frame_input_attachment_info = {};
+        myself_pass_per_frame_input_attachment_info.sampler =
             PVulkanUtil::getOrCreateNearestSampler(m_p_vulkan_context->_physical_device, m_p_vulkan_context->_device);
-        post_process_per_frame_input_attachment_info.imageView = input_attachment;
-        post_process_per_frame_input_attachment_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        myself_pass_per_frame_input_attachment_info.imageView = input_attachment;
+        myself_pass_per_frame_input_attachment_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
-        VkDescriptorImageInfo color_grading_LUT_image_info = {};
-        color_grading_LUT_image_info.sampler =
-            PVulkanUtil::getOrCreateLinearSampler(m_p_vulkan_context->_physical_device, m_p_vulkan_context->_device);
-        color_grading_LUT_image_info.imageView =
-            m_p_global_render_resource->_color_grading_resource._color_grading_LUT_texture_image_view;
-        color_grading_LUT_image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
-        VkWriteDescriptorSet post_process_descriptor_writes_info[2];
+        VkWriteDescriptorSet post_process_descriptor_writes_info[1];
 
         VkWriteDescriptorSet& post_process_descriptor_input_attachment_write_info =
             post_process_descriptor_writes_info[0];
@@ -239,17 +225,7 @@ namespace Pilot
         post_process_descriptor_input_attachment_write_info.dstArrayElement = 0;
         post_process_descriptor_input_attachment_write_info.descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
         post_process_descriptor_input_attachment_write_info.descriptorCount = 1;
-        post_process_descriptor_input_attachment_write_info.pImageInfo = &post_process_per_frame_input_attachment_info;
-
-        VkWriteDescriptorSet& post_process_descriptor_LUT_write_info = post_process_descriptor_writes_info[1];
-        post_process_descriptor_LUT_write_info.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        post_process_descriptor_LUT_write_info.pNext = NULL;
-        post_process_descriptor_LUT_write_info.dstSet = _descriptor_infos[0].descriptor_set;
-        post_process_descriptor_LUT_write_info.dstBinding = 1;
-        post_process_descriptor_LUT_write_info.dstArrayElement = 0;
-        post_process_descriptor_LUT_write_info.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        post_process_descriptor_LUT_write_info.descriptorCount = 1;
-        post_process_descriptor_LUT_write_info.pImageInfo = &color_grading_LUT_image_info;
+        post_process_descriptor_input_attachment_write_info.pImageInfo = &myself_pass_per_frame_input_attachment_info;
 
         vkUpdateDescriptorSets(m_p_vulkan_context->_device,
             sizeof(post_process_descriptor_writes_info) /
